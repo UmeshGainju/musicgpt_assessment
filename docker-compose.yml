@@ -54,7 +54,7 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
-    entrypoint: ['/bin/sh', '-c', 'npx prisma migrate deploy && node dist/main']
+    entrypoint: ['/bin/sh', '-c', './node_modules/.bin/prisma migrate deploy && node dist/main']
 
 volumes:
   postgres_data:
