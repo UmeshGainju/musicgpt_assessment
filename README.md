@@ -5,24 +5,24 @@ A production-ready NestJS backend for AI music generation with JWT authenticatio
 ## Architecture Overview
 
 ```
-┌────────────┐     ┌──────────┐     ┌───────────────┐
-│   Client   │────▶│  API     │────▶│  PostgreSQL   │
-│            │◀────│  Server  │◀────│               │
-└────────────┘     └────┬─────┘     └───────────────┘
-      ▲  WebSocket      │
-      │  (Socket.IO)    │ BullMQ
-      │                 ▼
-      │           ┌──────────┐     ┌───────────────┐
-      └───────────│  Worker  │────▶│    Redis       │
-                  │  Process │◀────│  (Cache/Queue/ │
-                  └──────────┘     │   Pub-Sub)     │
-                                   └───────────────┘
+┌────────────┐     ┌──────────────────┐     ┌───────────────┐
+│   Client   │────▶│   NestJS Server  │────▶│  PostgreSQL   │
+│            │◀────│  (API + Worker)  │◀────│               │
+└────────────┘     └────────┬─────────┘     └───────────────┘
+      ▲  WebSocket          │
+      │  (Socket.IO)        │ BullMQ (in-process)
+      │                     ▼
+      │              ┌───────────────┐
+      └──────────────│    Redis      │
+                     │ (Cache/Queue/ │
+                     │   Pub-Sub)    │
+                     └───────────────┘
 ```
 
 ### Key Design Decisions
 
 - **NestJS Modular Pattern**: Each feature lives under `src/modules/<feature>/` with flat file layout (`dto/`, `entities/`, `interfaces/` subdirectories) following the standard NestJS convention
-- **Separate Worker Process**: Job processing runs in its own container (`docker-compose.yml` → `worker` service), sharing the same codebase but only loading `WorkerModule`
+- **Inline Worker**: BullMQ job processing runs in-process via `@nestjs/bullmq` `WorkerHost`, eliminating the need for a separate worker container
 - **Cursor-Based Pagination**: All list endpoints use cursor pagination for consistent performance at scale
 - **Redis Sliding Window Rate Limiting**: Token-bucket alternative using sorted sets; FREE: 20 req/min, PAID: 100 req/min
 - **Search with Weighted Scoring**: Exact match (100), starts-with (50), contains (10) with base64-encoded score cursors
@@ -34,7 +34,7 @@ A production-ready NestJS backend for AI music generation with JWT authenticatio
 |-----------|-----------|
 | Framework | NestJS 10 |
 | Language | TypeScript 5.1 (strict mode) |
-| Database | PostgreSQL 16 + Prisma 5 |
+| Database | PostgreSQL 16 + Prisma 6 |
 | Cache/Queue | Redis 7 + ioredis |
 | Job Queue | BullMQ |
 | WebSocket | Socket.IO + Redis adapter |
@@ -104,9 +104,6 @@ src/
 │   └── websocket/                  # Real-time notifications
 │       ├── websocket.module.ts
 │       └── notification.gateway.ts # Socket.IO + Redis pub/sub
-├── worker/                         # Separate worker entrypoint
-│   ├── worker.ts                   # Standalone NestJS context
-│   └── worker.module.ts
 ├── infrastructure/                 # Cross-cutting infrastructure (global)
 │   ├── prisma/                     # PrismaService, PrismaModule
 │   └── redis/                      # RedisService, RedisModule
@@ -147,17 +144,14 @@ cp .env.example .env
 pnpm exec prisma generate
 pnpm exec prisma migrate dev
 
-# 4. Start API server
+# 4. Start server (API + inline worker)
 pnpm start:dev
-
-# 5. Start worker (separate terminal)
-pnpm start:worker
 ```
 
 ### Docker (Recommended)
 
 ```bash
-# Start everything: API + Worker + PostgreSQL + Redis
+# Start everything: API + PostgreSQL + Redis
 docker-compose up --build
 
 # API available at http://localhost:3000
@@ -217,7 +211,7 @@ docker-compose up --build
 1. User POST /prompts → creates Prompt (status: PENDING)
 2. Cron job (every 10s) scans PENDING prompts, batch of 50
 3. Sets to PROCESSING and enqueues via BullMQ (PAID priority=1, FREE priority=10)
-4. Worker picks up job:
+4. Inline BullMQ processor picks up job:
    a. Simulates AI processing (PAID: 2s, FREE: 5s)
    b. Creates Audio entry in DB
    c. Sets Prompt status → COMPLETED
