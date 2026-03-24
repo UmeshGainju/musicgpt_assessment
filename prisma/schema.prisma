@@ -1,0 +1,82 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+enum SubscriptionStatus {
+  FREE
+  PAID
+}
+
+enum PromptStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+}
+
+model User {
+  id                  String             @id @default(uuid(7))
+  email               String             @unique
+  password            String
+  display_name        String
+  subscription_status SubscriptionStatus @default(FREE)
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+
+  prompts        Prompt[]
+  audios         Audio[]
+  refresh_tokens RefreshToken[]
+
+  @@index([email])
+  @@index([display_name])
+}
+
+model Prompt {
+  id         String       @id @default(uuid(7))
+  user_id    String
+  text       String
+  status     PromptStatus @default(PENDING)
+  created_at DateTime     @default(now())
+  updated_at DateTime     @updatedAt
+
+  user  User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  audio Audio?
+
+  @@index([status])
+  @@index([user_id])
+}
+
+model Audio {
+  id         String   @id @default(uuid(7))
+  prompt_id  String   @unique
+  user_id    String
+  title      String
+  url        String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  prompt Prompt @relation(fields: [prompt_id], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([title])
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid(7))
+  user_id    String
+  token_hash String   @unique
+  expires_at DateTime
+  revoked    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([token_hash])
+}
