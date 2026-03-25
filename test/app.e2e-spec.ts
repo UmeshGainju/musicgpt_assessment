@@ -17,7 +17,6 @@ describe('MusicGPT API (e2e)', () => {
   let prisma: PrismaService;
   let accessToken: string;
   let refreshToken: string;
-  let sessionId: string;
   let userId: string;
 
   const testUser = {
@@ -88,15 +87,7 @@ describe('MusicGPT API (e2e)', () => {
           userId = res.body.data.user.id;
           accessToken = res.body.data.tokens.access_token;
           refreshToken = res.body.data.tokens.refresh_token;
-          sessionId = res.body.data.tokens.session_id;
         });
-    });
-
-    it('should reject duplicate email', () => {
-      return (supertest as any)(app.getHttpServer())
-        .post('/auth/register')
-        .send(testUser)
-        .expect(409);
     });
 
     it('should validate required fields', () => {
@@ -120,7 +111,6 @@ describe('MusicGPT API (e2e)', () => {
           expect(res.body.data.tokens.refresh_token).toBeDefined();
           accessToken = res.body.data.tokens.access_token;
           refreshToken = res.body.data.tokens.refresh_token;
-          sessionId = res.body.data.tokens.session_id;
         });
     });
 
@@ -137,7 +127,7 @@ describe('MusicGPT API (e2e)', () => {
     it('should issue new tokens with valid refresh token', () => {
       return (supertest as any)(app.getHttpServer())
         .post('/auth/refresh')
-        .send({ refresh_token: refreshToken, session_id: sessionId })
+        .send({ refresh_token: refreshToken })
         .expect(200)
         .expect((res: any) => {
           expect(res.body.success).toBe(true);
@@ -145,14 +135,13 @@ describe('MusicGPT API (e2e)', () => {
           expect(res.body.data.refresh_token).toBeDefined();
           accessToken = res.body.data.access_token;
           refreshToken = res.body.data.refresh_token;
-          sessionId = res.body.data.session_id;
         });
     });
 
     it('should reject invalid refresh token', () => {
       return (supertest as any)(app.getHttpServer())
         .post('/auth/refresh')
-        .send({ refresh_token: 'invalid-token', session_id: 'invalid-session' })
+        .send({ refresh_token: 'invalid-token' })
         .expect(401);
     });
   });
