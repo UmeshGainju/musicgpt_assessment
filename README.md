@@ -2,6 +2,8 @@
 
 A production-ready NestJS backend for AI music generation with JWT authentication, tiered subscriptions, background job processing, real-time notifications, and comprehensive search.
 
+**Live Server:** [https://musicgpt-assessment.onrender.com/api/docs](https://musicgpt-assessment.onrender.com/api/docs)
+
 ## Architecture Overview
 
 ```
