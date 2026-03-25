@@ -4,6 +4,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import helmet from 'helmet';
+import compression from 'compression';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
@@ -14,6 +16,25 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.getOrThrow<number>('PORT');
+
+  // Security headers
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.socket.io'],
+          connectSrc: ["'self'", 'wss:', 'ws:'],
+        },
+      },
+    }),
+  );
+
+  // Gzip response compression
+  app.use(compression());
+
+  // Disable X-Powered-By header
+  app.disable('x-powered-by');
 
   // Serve static test client from /public
   app.useStaticAssets(join(__dirname, '..', 'public'));
@@ -34,7 +55,11 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformResponseInterceptor());
 
   // CORS
-  app.enableCors();
+  app.enableCors({
+    origin: '*', // Adjust in production
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
+  });
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()

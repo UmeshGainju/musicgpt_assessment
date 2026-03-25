@@ -44,6 +44,8 @@ A production-ready NestJS backend for AI music generation with JWT authenticatio
 | Cron | @nestjs/schedule |
 | Docs | Swagger (OpenAPI 3.0) |
 | Container | Docker + docker-compose |
+| Security | Helmet (HTTP headers) |
+| Compression | gzip/deflate (compression) |
 | CI | GitHub Actions |
 
 ## Project Structure
@@ -244,6 +246,15 @@ socket.on('prompt:completed', (data) => {
 | PAID | 100 requests | 60 seconds |
 
 Implemented with Redis sorted set sliding window. Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
+
+## Security & Performance
+
+| Feature | Middleware | Purpose |
+|---------|-----------|---------|
+| Security Headers | `helmet` | Sets `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection` and other recommended HTTP headers |
+| Response Compression | `compression` | Gzip/deflate compression for all HTTP responses, reducing payload size |
+| CORS | `app.enableCors()` | Cross-Origin Resource Sharing — allows all origins (`*`) for both HTTP and WebSocket (`/notifications` namespace). In production, restrict to specific domains via `origin: ['https://yourdomain.com']` |
+| Fingerprint Removal | `app.disable('x-powered-by')` | Hides the `X-Powered-By: Express` header to prevent server fingerprinting |
 
 ## Running Tests
 
