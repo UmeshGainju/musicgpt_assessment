@@ -66,6 +66,7 @@ src/
 │   │   ├── user.module.ts
 │   │   ├── user.controller.ts
 │   │   ├── user.service.ts
+│   │   ├── user.service.spec.ts
 │   │   ├── user.repository.ts      # Prisma implementation
 │   │   ├── dto/                    # UpdateUserDto
 │   │   ├── entities/               # UserEntity
@@ -79,14 +80,16 @@ src/
 │   │   ├── prompt.module.ts
 │   │   ├── prompt.controller.ts
 │   │   ├── prompt.service.ts       # Redis cached
+│   │   ├── prompt.service.spec.ts
 │   │   ├── prompt.repository.ts    # Includes findPending
 │   │   ├── dto/                    # CreatePromptDto
 │   │   ├── entities/               # PromptEntity
 │   │   └── interfaces/             # IPromptRepository
-│   ├── audio/                      # Audio CRUD (created by worker)
+│   ├── audio/                      # Audio CRUD (created by processor)
 │   │   ├── audio.module.ts
 │   │   ├── audio.controller.ts
 │   │   ├── audio.service.ts        # Redis cached
+│   │   ├── audio.service.spec.ts
 │   │   ├── audio.repository.ts
 │   │   ├── dto/                    # UpdateAudioDto
 │   │   ├── entities/               # AudioEntity
@@ -100,11 +103,13 @@ src/
 │   ├── queue/                      # BullMQ producer + processor
 │   │   ├── queue.module.ts
 │   │   ├── prompt.producer.ts      # Enqueues jobs with priority
+│   │   ├── prompt.producer.spec.ts
 │   │   ├── prompt.processor.ts     # Processes jobs (simulated AI)
 │   │   └── prompt.processor.spec.ts
 │   ├── scheduler/                  # Cron job to poll pending prompts
 │   │   ├── scheduler.module.ts
-│   │   └── prompt.scheduler.ts     # @Cron every 10s, batch 50
+│   │   ├── prompt.scheduler.ts     # @Cron every 10s, batch 50
+│   │   └── prompt.scheduler.spec.ts
 │   └── websocket/                  # Real-time notifications
 │       ├── websocket.module.ts
 │       └── notification.gateway.ts # Socket.IO + Redis pub/sub
@@ -114,20 +119,28 @@ src/
 ├── common/                         # Shared utilities
 │   ├── decorators/                 # @CurrentUser, @Public
 │   ├── guards/                     # JwtAuthGuard, RateLimitGuard
+│   │   └── rate-limit.guard.spec.ts
 │   ├── filters/                    # AllExceptionsFilter
 │   ├── dto/                        # CursorPaginationDto
 │   └── interfaces/                 # Pagination interfaces
 ├── env.validation.ts               # Environment variable validation
 ├── app.module.ts                   # Root module (API server)
 ├── app.controller.ts               # Health check endpoint
-└── main.ts                         # Bootstrap (Swagger, CORS, pipes)
+├── app.controller.spec.ts
+└── main.ts                         # Bootstrap (Helmet, CORS, compression, Swagger)
+public/                             # Static test client
+├── index.html                      # Interactive UI for testing all endpoints + WebSocket
+└── favicon.ico
+test/
+├── app.e2e-spec.ts                 # E2E tests (17 tests)
+└── jest-e2e.json
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js ≥ 20.x
+- Node.js ≥ 22.x
 - pnpm ≥ 9.x
 - PostgreSQL 16
 - Redis 7
@@ -175,9 +188,9 @@ docker-compose up --build
 ### Users
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/users/me` | Bearer | Get current user profile |
-| PUT | `/users/me` | Bearer | Update display name |
 | GET | `/users` | Bearer | List users (cursor paginated) |
+| GET | `/users/:id` | Bearer | Get user by ID |
+| PUT | `/users/:id` | Bearer | Update display name |
 
 ### Subscriptions
 | Method | Endpoint | Auth | Description |
@@ -197,7 +210,6 @@ docker-compose up --build
 | GET | `/audio` | Bearer | List my audio (paginated) |
 | GET | `/audio/:id` | Bearer | Get single audio |
 | PUT | `/audio/:id` | Bearer | Update audio title |
-| DELETE | `/audio/:id` | Bearer | Delete audio |
 
 ### Search
 | Method | Endpoint | Auth | Description |
@@ -259,15 +271,45 @@ Implemented with Redis sorted set sliding window. Returns `429 Too Many Requests
 ## Running Tests
 
 ```bash
-# Unit tests
+# Unit tests (11 suites, 57 tests)
 pnpm test
 
 # Unit tests with coverage
 pnpm test:cov
 
-# E2E tests (requires running PostgreSQL + Redis)
+# E2E tests (17 tests — requires running PostgreSQL + Redis)
 pnpm test:e2e
 ```
+
+### Test Coverage
+
+| Suite | Module | Tests |
+|-------|--------|-------|
+| auth.service.spec | Auth | 8 |
+| subscription.service.spec | Subscription | 4 |
+| search.service.spec | Search | 6 |
+| rate-limit.guard.spec | Rate Limiting | 5 |
+| user.service.spec | User | 6 |
+| prompt.service.spec | Prompt | 4 |
+| audio.service.spec | Audio | 7 |
+| prompt.producer.spec | Queue Producer | 2 |
+| prompt.processor.spec | Queue Processor | 5 |
+| prompt.scheduler.spec | Scheduler | 5 |
+| app.controller.spec | Health | 5 |
+| **app.e2e-spec** | **E2E (all endpoints)** | **17** |
+
+## Test Client (UI)
+
+A built-in interactive test client is available at the root URL:
+
+- **Local**: `http://localhost:3000/`
+- **Live**: [https://musicgpt-assessment.onrender.com](https://musicgpt-assessment.onrender.com)
+
+Features:
+- Register / Login / Logout
+- WebSocket connect — real-time `prompt:completed` events
+- Submit prompts and watch the full generation pipeline
+- Quick actions: view prompts, audio, upgrade/downgrade subscription
 
 ## Swagger Documentation
 
