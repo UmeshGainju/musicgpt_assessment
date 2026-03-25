@@ -53,9 +53,9 @@
     <label>Display Name (for register)</label>
     <input id="displayName" value="Test User">
     <div>
-      <button class="btn-primary" onclick="register()">Register</button>
-      <button class="btn-success" onclick="login()">Login</button>
-      <button class="btn-danger" onclick="logout()">Logout</button>
+      <button class="btn-primary" id="btnRegister">Register</button>
+      <button class="btn-success" id="btnLogin">Login</button>
+      <button class="btn-danger" id="btnLogout">Logout</button>
     </div>
     <div id="tokenInfo" class="token-display"></div>
   </div>
@@ -65,8 +65,8 @@
     <h2>2. WebSocket</h2>
     <span id="wsStatus" class="status disconnected">Disconnected</span>
     <div>
-      <button class="btn-success" onclick="connectSocket()" id="btnConnect">Connect</button>
-      <button class="btn-danger" onclick="disconnectSocket()" id="btnDisconnect" disabled>Disconnect</button>
+      <button class="btn-success" id="btnConnect">Connect</button>
+      <button class="btn-danger" id="btnDisconnect" disabled>Disconnect</button>
     </div>
     <p style="font-size:0.75rem; color:#888; margin-top:8px;">
       Connects to <code>/notifications</code> namespace with your JWT. Listens for <code>prompt:completed</code> events.
@@ -78,17 +78,17 @@
     <h2>3. Submit Prompt</h2>
     <label>Prompt Text</label>
     <textarea id="promptText">Generate a relaxing lo-fi beat with piano and rain sounds</textarea>
-    <button class="btn-primary" onclick="submitPrompt()">Submit Prompt</button>
+    <button class="btn-primary" id="btnSubmitPrompt">Submit Prompt</button>
   </div>
 
   <!-- Quick Actions -->
   <div class="card">
     <h2>4. Quick Actions</h2>
-    <button class="btn-secondary" onclick="getMyPrompts()">My Prompts</button>
-    <button class="btn-secondary" onclick="getMyAudio()">My Audio</button>
-    <button class="btn-secondary" onclick="healthCheck()">Health Check</button>
-    <button class="btn-secondary" onclick="subscribe()">Upgrade to PAID</button>
-    <button class="btn-secondary" onclick="cancelSub()">Downgrade to FREE</button>
+    <button class="btn-secondary" id="btnMyPrompts">My Prompts</button>
+    <button class="btn-secondary" id="btnMyAudio">My Audio</button>
+    <button class="btn-secondary" id="btnHealth">Health Check</button>
+    <button class="btn-secondary" id="btnSubscribe">Upgrade to PAID</button>
+    <button class="btn-secondary" id="btnCancel">Downgrade to FREE</button>
   </div>
 </div>
 
@@ -96,7 +96,7 @@
 <div id="log"></div>
 
 <script>
-  const BASE = 'https://musicgpt-assessment.onrender.com';
+  const BASE = window.location.origin;
   let accessToken = null;
   let refreshToken = null;
   let socket = null;
@@ -297,6 +297,19 @@
 
   // Initial health check
   healthCheck();
+
+  // Bind event listeners
+  document.getElementById('btnRegister').addEventListener('click', register);
+  document.getElementById('btnLogin').addEventListener('click', login);
+  document.getElementById('btnLogout').addEventListener('click', logout);
+  document.getElementById('btnConnect').addEventListener('click', connectSocket);
+  document.getElementById('btnDisconnect').addEventListener('click', disconnectSocket);
+  document.getElementById('btnSubmitPrompt').addEventListener('click', submitPrompt);
+  document.getElementById('btnMyPrompts').addEventListener('click', getMyPrompts);
+  document.getElementById('btnMyAudio').addEventListener('click', getMyAudio);
+  document.getElementById('btnHealth').addEventListener('click', healthCheck);
+  document.getElementById('btnSubscribe').addEventListener('click', subscribe);
+  document.getElementById('btnCancel').addEventListener('click', cancelSub);
 </script>
 </body>
 </html>

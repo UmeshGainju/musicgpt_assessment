@@ -24,7 +24,9 @@ async function bootstrap() {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.socket.io'],
-          connectSrc: ["'self'", 'wss:', 'ws:'],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          connectSrc: ["'self'", 'wss:', 'ws:', 'https:'],
+          imgSrc: ["'self'", 'data:'],
         },
       },
     }),
