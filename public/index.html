@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MusicGPT — Test Client</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
+    h1 { font-size: 1.5rem; margin-bottom: 16px; color: #a78bfa; }
+    h2 { font-size: 1.1rem; margin-bottom: 8px; color: #7c3aed; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; }
+    .card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; }
+    label { display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 4px; }
+    input, textarea { width: 100%; padding: 8px; border: 1px solid #444; border-radius: 4px; background: #222; color: #fff; margin-bottom: 8px; font-size: 0.9rem; }
+    textarea { resize: vertical; min-height: 60px; }
+    button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 600; margin-right: 6px; margin-bottom: 6px; }
+    .btn-primary { background: #7c3aed; color: #fff; }
+    .btn-primary:hover { background: #6d28d9; }
+    .btn-success { background: #059669; color: #fff; }
+    .btn-success:hover { background: #047857; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-secondary { background: #444; color: #fff; }
+    .btn-secondary:hover { background: #555; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { font-size: 0.8rem; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
+    .status.connected { background: #065f46; color: #6ee7b7; }
+    .status.disconnected { background: #7f1d1d; color: #fca5a5; }
+    #log { background: #111; border: 1px solid #333; border-radius: 4px; padding: 12px; font-family: 'SF Mono', monospace; font-size: 0.8rem; max-height: 350px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; line-height: 1.6; margin-top: 16px; max-width: 900px; }
+    .log-info { color: #93c5fd; }
+    .log-success { color: #6ee7b7; }
+    .log-error { color: #fca5a5; }
+    .log-event { color: #fbbf24; }
+    .log-data { color: #c4b5fd; }
+    .token-display { font-size: 0.7rem; color: #666; word-break: break-all; margin-top: 4px; }
+    .full-width { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+
+<h1>🎵 MusicGPT — Test Client</h1>
+
+<div class="grid">
+  <!-- Auth Card -->
+  <div class="card">
+    <h2>1. Authentication</h2>
+    <label>Email</label>
+    <input id="email" type="email" value="test@example.com">
+    <label>Password</label>
+    <input id="password" type="password" value="securePassword123">
+    <label>Display Name (for register)</label>
+    <input id="displayName" value="Test User">
+    <div>
+      <button class="btn-primary" onclick="register()">Register</button>
+      <button class="btn-success" onclick="login()">Login</button>
+      <button class="btn-danger" onclick="logout()">Logout</button>
+    </div>
+    <div id="tokenInfo" class="token-display"></div>
+  </div>
+
+  <!-- WebSocket Card -->
+  <div class="card">
+    <h2>2. WebSocket</h2>
+    <span id="wsStatus" class="status disconnected">Disconnected</span>
+    <div>
+      <button class="btn-success" onclick="connectSocket()" id="btnConnect">Connect</button>
+      <button class="btn-danger" onclick="disconnectSocket()" id="btnDisconnect" disabled>Disconnect</button>
+    </div>
+    <p style="font-size:0.75rem; color:#888; margin-top:8px;">
+      Connects to <code>/notifications</code> namespace with your JWT. Listens for <code>prompt:completed</code> events.
+    </p>
+  </div>
+
+  <!-- Prompt Card -->
+  <div class="card">
+    <h2>3. Submit Prompt</h2>
+    <label>Prompt Text</label>
+    <textarea id="promptText">Generate a relaxing lo-fi beat with piano and rain sounds</textarea>
+    <button class="btn-primary" onclick="submitPrompt()">Submit Prompt</button>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="card">
+    <h2>4. Quick Actions</h2>
+    <button class="btn-secondary" onclick="getMyPrompts()">My Prompts</button>
+    <button class="btn-secondary" onclick="getMyAudio()">My Audio</button>
+    <button class="btn-secondary" onclick="healthCheck()">Health Check</button>
+    <button class="btn-secondary" onclick="subscribe()">Upgrade to PAID</button>
+    <button class="btn-secondary" onclick="cancelSub()">Downgrade to FREE</button>
+  </div>
+</div>
+
+<!-- Log -->
+<div id="log"></div>
+
+<script>
+  const BASE = window.location.origin;
+  let accessToken = null;
+  let refreshToken = null;
+  let socket = null;
+
+  // --- Logging ---
+  function log(msg, cls = 'log-info') {
+    const el = document.getElementById('log');
+    const time = new Date().toLocaleTimeString();
+    el.innerHTML += `<span class="${cls}">[${time}] ${escapeHtml(msg)}</span>\n`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function logJson(label, obj) {
+    log(label, 'log-data');
+    log(JSON.stringify(obj, null, 2), 'log-data');
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function updateTokenDisplay() {
+    const el = document.getElementById('tokenInfo');
+    if (accessToken) {
+      el.textContent = `Access: ${accessToken.slice(0, 30)}…`;
+    } else {
+      el.textContent = '';
+    }
+  }
+
+  // --- HTTP helpers ---
+  async function api(method, path, body) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+    };
+    if (accessToken) opts.headers['Authorization'] = `Bearer ${accessToken}`;
+    if (body) opts.body = JSON.stringify(body);
+
+    const res = await fetch(`${BASE}${path}`, opts);
+    const json = await res.json();
+    if (!res.ok) throw { status: res.status, ...json };
+    return json;
+  }
+
+  // --- Auth ---
+  async function register() {
+    try {
+      const res = await api('POST', '/auth/register', {
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+        display_name: document.getElementById('displayName').value,
+      });
+      accessToken = res.data.tokens.access_token;
+      refreshToken = res.data.tokens.refresh_token;
+      log('✅ Registered successfully', 'log-success');
+      updateTokenDisplay();
+    } catch (e) {
+      log(`❌ Register failed: ${JSON.stringify(e)}`, 'log-error');
+    }
+  }
+
+  async function login() {
+    try {
+      const res = await api('POST', '/auth/login', {
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+      });
+      accessToken = res.data.tokens.access_token;
+      refreshToken = res.data.tokens.refresh_token;
+      log('✅ Logged in successfully', 'log-success');
+      updateTokenDisplay();
+    } catch (e) {
+      log(`❌ Login failed: ${JSON.stringify(e)}`, 'log-error');
+    }
+  }
+
+  async function logout() {
+    try {
+      await api('POST', '/auth/logout');
+      log('✅ Logged out', 'log-success');
+    } catch (e) {
+      log(`❌ Logout failed: ${JSON.stringify(e)}`, 'log-error');
+    }
+    accessToken = null;
+    refreshToken = null;
+    updateTokenDisplay();
+    disconnectSocket();
+  }
+
+  // --- WebSocket ---
+  function connectSocket() {
+    if (!accessToken) { log('❌ Login first!', 'log-error'); return; }
+    if (socket?.connected) { log('Already connected', 'log-info'); return; }
+
+    socket = io(`${BASE}/notifications`, {
+      auth: { token: accessToken },
+      transports: ['websocket'],
+    });
+
+    socket.on('connect', () => {
+      log('🔌 WebSocket connected (id: ' + socket.id + ')', 'log-success');
+      document.getElementById('wsStatus').textContent = 'Connected';
+      document.getElementById('wsStatus').className = 'status connected';
+      document.getElementById('btnConnect').disabled = true;
+      document.getElementById('btnDisconnect').disabled = false;
+    });
+
+    socket.on('disconnect', (reason) => {
+      log('🔌 WebSocket disconnected: ' + reason, 'log-error');
+      document.getElementById('wsStatus').textContent = 'Disconnected';
+      document.getElementById('wsStatus').className = 'status disconnected';
+      document.getElementById('btnConnect').disabled = false;
+      document.getElementById('btnDisconnect').disabled = true;
+    });
+
+    socket.on('connect_error', (err) => {
+      log('❌ WebSocket error: ' + err.message, 'log-error');
+    });
+
+    // Listen for prompt completion
+    socket.on('prompt:completed', (data) => {
+      log('🎶 PROMPT COMPLETED!', 'log-event');
+      logJson('  Event data:', data);
+    });
+  }
+
+  function disconnectSocket() {
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+  }
+
+  // --- Prompt ---
+  async function submitPrompt() {
+    try {
+      const res = await api('POST', '/prompts', {
+        text: document.getElementById('promptText').value,
+      });
+      log('✅ Prompt submitted (status: PENDING)', 'log-success');
+      logJson('  Prompt:', res.data);
+    } catch (e) {
+      log(`❌ Submit failed: ${JSON.stringify(e)}`, 'log-error');
+    }
+  }
+
+  // --- Quick actions ---
+  async function getMyPrompts() {
+    try {
+      const res = await api('GET', '/prompts');
+      log('📋 My Prompts:', 'log-info');
+      logJson('', res.data);
+    } catch (e) {
+      log(`❌ ${JSON.stringify(e)}`, 'log-error');
+    }
+  }
+
+  async function getMyAudio() {
+    try {
+      const res = await api('GET', '/audio');
+      log('🔊 My Audio:', 'log-info');
+      logJson('', res.data);
+    } catch (e) {
+      log(`❌ ${JSON.stringify(e)}`, 'log-error');
+    }
+  }
+
+  async function healthCheck() {
+    try {
+      const res = await fetch(`${BASE}/health`);
+      const json = await res.json();
+      log('💚 Health: ' + JSON.stringify(json), 'log-success');
+    } catch (e) {
+      log(`❌ Health check failed`, 'log-error');
+    }
+  }
+
+  async function subscribe() {
+    try {
+      const res = await api('POST', '/subscription/subscribe');
+      log('✅ Upgraded to PAID', 'log-success');
+    } catch (e) {
+      log(`❌ ${JSON.stringify(e)}`, 'log-error');
+    }
+  }
+
+  async function cancelSub() {
+    try {
+      const res = await api('POST', '/subscription/cancel');
+      log('✅ Downgraded to FREE', 'log-success');
+    } catch (e) {
+      log(`❌ ${JSON.stringify(e)}`, 'log-error');
+    }
+  }
+
+  // Initial health check
+  healthCheck();
+</script>
+</body>
+</html>
