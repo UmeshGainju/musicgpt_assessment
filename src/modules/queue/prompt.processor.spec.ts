@@ -85,6 +85,7 @@ describe('PromptProcessor', () => {
       url: 'https://cdn.musicgpt.ai/audio/prompt-1.mp3',
     };
 
+    // eslint-disable-next-line @typescript-eslint/ban-types
     prisma.$transaction.mockImplementation(async (fn: Function) => {
       const tx = {
         audio: {
@@ -150,6 +151,7 @@ describe('PromptProcessor', () => {
       url: 'https://cdn.musicgpt.ai/audio/prompt-1.mp3',
     };
 
+    // eslint-disable-next-line @typescript-eslint/ban-types
     prisma.$transaction.mockImplementation(async (fn: Function) => {
       const tx = {
         audio: {

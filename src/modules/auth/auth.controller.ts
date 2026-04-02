@@ -50,9 +50,7 @@ export class AuthController {
     summary: 'Refresh access token using refresh token and session ID',
   })
   @SwaggerDecorator.ApiOk(swaggerResponses.auth.refreshed)
-  @SwaggerDecorator.ApiUnauthorized(
-    'Invalid or expired refresh token',
-  )
+  @SwaggerDecorator.ApiUnauthorized('Invalid or expired refresh token')
   @SwaggerDecorator.ApiPreconditionFailed(swaggerResponses.validationFailed)
   async refresh(@Body() dto: RefreshDto) {
     const data = await this.authService.refresh(dto.refresh_token);

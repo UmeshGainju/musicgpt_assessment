@@ -59,7 +59,7 @@ async function bootstrap() {
   // CORS
   app.enableCors({
     origin: '*', // Adjust in production
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
